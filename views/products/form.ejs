@@ -1,0 +1,11 @@
+<%- include('../partials/header', { title }) %>
+<div class="page-head"><div><span class="eyebrow">SELL SOMETHING</span><h1><%= title %></h1></div><a href="/products/mine">내 상품 관리 →</a></div>
+<form class="card form product-form" method="post" <% if (!product) { %>enctype="multipart/form-data"<% } %> action="<%= action %>">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <label>상품명<input name="name" value="<%= product?.name || '' %>" required minlength="2" maxlength="80"></label>
+  <div class="split"><label>가격 (P)<input type="number" name="price" value="<%= product?.price ?? '' %>" min="0" max="100000000" required></label><label>카테고리<select name="category" required><% categories.forEach((category) => { %><option value="<%= category %>" <%= product?.category === category ? 'selected' : '' %>><%= category %></option><% }) %></select></label></div>
+  <label>설명<textarea name="description" rows="8" minlength="5" maxlength="3000" required><%= product?.description || '' %></textarea></label>
+  <% if (!product) { %><label>사진 (선택)<input type="file" name="images" accept=".jpg,.jpeg,.png,.gif,.webp" multiple><small>JPG, PNG, GIF, WebP / 파일당 5MB / 최대 5개</small></label><% } %>
+  <button class="button"><%= product ? '수정 저장' : '상품 등록' %></button>
+</form>
+<%- include('../partials/footer') %>

@@ -1,0 +1,5 @@
+<%- include('../partials/header', { title }) %>
+<div class="page-head"><div><span class="eyebrow">TOWN SQUARE</span><h1>전체 채팅</h1><p>모두가 함께 이야기하는 공간입니다.</p></div><a href="/chat">1:1 채팅 →</a></div>
+<section class="chat-box card"><div class="messages"><% messages.forEach((message) => { %><article class="message <%= message.sender.id === currentUser.id ? 'mine' : '' %>"><div><a href="/users/<%= message.sender.id %>"><strong><%= message.sender.nickname %></strong></a><time><%= message.createdAt.toLocaleString('ko-KR') %></time></div><p><%= message.body %></p></article><% }) %></div><form class="message-form" method="post" action="/chat/global"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><textarea name="body" rows="2" maxlength="1000" required placeholder="메시지를 입력하세요"></textarea><button class="button">보내기</button></form></section>
+<p class="muted">도배 방지: 사용자별 10초에 10개, 1분에 30개까지 전송할 수 있습니다.</p>
+<%- include('../partials/footer') %>

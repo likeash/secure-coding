@@ -1,0 +1,4 @@
+<%- include('../partials/header', { title }) %>
+<div class="page-head"><div><span class="eyebrow">MY LISTINGS</span><h1>내 상품 관리</h1></div><a class="button" href="/products/new">새 상품 등록</a></div>
+<div class="table-wrap"><table><thead><tr><th>상품</th><th>가격</th><th>상태</th><th>신고</th><th>관리</th></tr></thead><tbody><% products.forEach((product) => { %><tr><td><a href="/products/<%= product.id %>"><%= product.name %></a></td><td><%= product.price.toLocaleString() %>P</td><td><span class="pill"><%= product.status %></span></td><td><%= product._count.reports %></td><td><a href="/products/<%= product.id %>/edit">수정</a></td></tr><% }) %></tbody></table></div>
+<%- include('../partials/footer') %>

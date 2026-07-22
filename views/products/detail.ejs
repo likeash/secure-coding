@@ -1,0 +1,12 @@
+<%- include('../partials/header', { title }) %>
+<article class="detail-grid">
+  <section class="gallery"><% if (product.images.length) { product.images.forEach((image) => { %><img src="/images/<%= image.id %>" alt="<%= product.name %>"><% }) } else { %><div class="thumb placeholder">tiny market</div><% } %></section>
+  <section class="detail-copy"><span class="pill"><%= product.category %></span><h1><%= product.name %></h1><p class="price"><%= product.price.toLocaleString() %><small>P</small></p><p class="description"><%= product.description %></p>
+    <div class="seller"><div><small>판매자</small><a href="/users/<%= product.owner.id %>"><strong><%= product.owner.nickname %></strong></a></div>
+      <% if (currentUser && currentUser.id !== product.owner.id) { %><form method="post" action="/chat/start/<%= product.owner.id %>"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="button">채팅 걸기</button></form><% } %>
+    </div>
+    <% if (canManage) { %><div class="actions"><a class="button secondary" href="/products/<%= product.id %>/edit">수정</a><form method="post" action="/products/<%= product.id %>/delete"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="danger">삭제</button></form></div><p class="muted">상태: <%= product.status %> · 신고 <%= product._count.reports %>회</p><% } %>
+    <% if (currentUser && currentUser.id !== product.owner.id) { %><details><summary>차단 또는 신고</summary><div class="stack"><form method="post" action="/products/<%= product.id %>/block"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="secondary">이 상품 숨기기</button></form><form method="post" action="/reports/product/<%= product.id %>"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><label>신고 사유<textarea name="reason" minlength="5" maxlength="500" required></textarea></label><button class="danger">상품 신고</button></form></div></details><% } %>
+  </section>
+</article>
+<%- include('../partials/footer') %>

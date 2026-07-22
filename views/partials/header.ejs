@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %> · Tiny Market</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span>tiny</span> market</a>
+    <nav>
+      <a href="/">상품</a>
+      <% if (currentUser) { %>
+        <a href="/products/new">판매하기</a>
+        <a href="/chat/global">전체 채팅</a>
+        <a href="/chat">1:1 채팅</a>
+        <a href="/mypage">마이페이지</a>
+        <% if (currentUser.role === 'ADMIN') { %><a href="/admin">관리자</a><% } %>
+        <form class="inline" method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="link-button">로그아웃</button></form>
+      <% } else { %>
+        <a href="/login">로그인</a><a class="nav-cta" href="/register">회원가입</a>
+      <% } %>
+    </nav>
+  </header>
+  <main class="container">
+    <% if (flash) { %><div class="flash <%= flash.type %>" role="alert"><%= flash.message %></div><% } %>

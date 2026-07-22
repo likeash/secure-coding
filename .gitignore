@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# SQLite databases and runtime session stores
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
+
+# User-uploaded product images (keep the directory itself)
+storage/product-images/*
+!storage/product-images/.gitkeep
+
+# Test, coverage, and generated output
+coverage/
+.nyc_output/
+outputs/
+work/
+dist/
+tmp/
+temp/
+
+# Logs and process files
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.pid
+*.pid.lock
+
+# Editor and OS metadata
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+Desktop.ini
+

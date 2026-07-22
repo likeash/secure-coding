@@ -1,0 +1,15 @@
+<%- include('../partials/header', { title }) %>
+<section class="hero"><div><span class="eyebrow">TINY FINDS, BIG STORIES</span><h1>누군가의 좋은 물건을<br>가볍게 발견하세요.</h1></div><p>필요했던 것과 우연히 마주치는 작은 중고 장터입니다.</p></section>
+<form class="searchbar" method="get" action="/">
+  <input aria-label="검색어" name="q" value="<%= filters.q %>" maxlength="60" placeholder="어떤 물건을 찾으세요?">
+  <select name="category"><option value="">모든 카테고리</option><% categories.forEach((category) => { %><option value="<%= category %>" <%= filters.category === category ? 'selected' : '' %>><%= category %></option><% }) %></select>
+  <select name="sort"><option value="newest" <%= filters.sort === 'newest' ? 'selected' : '' %>>최신순</option><option value="oldest" <%= filters.sort === 'oldest' ? 'selected' : '' %>>오래된순</option><option value="price_asc" <%= filters.sort === 'price_asc' ? 'selected' : '' %>>가격 낮은순</option><option value="price_desc" <%= filters.sort === 'price_desc' ? 'selected' : '' %>>가격 높은순</option></select>
+  <button class="button">검색</button>
+</form>
+<div class="section-head"><h2>오늘의 발견</h2><span><%= products.length %>개 표시</span></div>
+<section class="product-grid">
+  <% products.forEach((product) => { %><a class="product-card" href="/products/<%= product.id %>"><div class="thumb"><% if (product.images[0]) { %><img src="/images/<%= product.images[0].id %>" alt=""><% } else { %><span>tiny</span><% } %></div><h3><%= product.name %></h3></a><% }) %>
+</section>
+<% if (!products.length) { %><div class="empty"><h2>조건에 맞는 상품이 없습니다.</h2><p>검색어 또는 카테고리를 바꿔보세요.</p></div><% } %>
+<nav class="pagination"><% for(let p = 1; p <= pages; p += 1) { %><a class="<%= p === filters.page ? 'active' : '' %>" href="/?q=<%= encodeURIComponent(filters.q) %>&category=<%= encodeURIComponent(filters.category) %>&sort=<%= filters.sort %>&page=<%= p %>"><%= p %></a><% } %></nav>
+<%- include('../partials/footer') %>

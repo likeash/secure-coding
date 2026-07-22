@@ -1,0 +1,38 @@
+{
+  "name": "tiny-second-hand-shopping-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "보안 요구사항을 적용한 소형 중고거래 플랫폼",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "prisma:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev --name init",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "node prisma/seed.js",
+    "test": "node tests/setup-db.js && cross-env DATABASE_URL=file:./test.db SESSION_DB=test-sessions.sqlite prisma db push --force-reset && cross-env DATABASE_URL=file:./test.db SESSION_DB=test-sessions.sqlite node --test"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "6.16.2",
+    "argon2": "0.44.0",
+    "connect-sqlite3": "0.9.16",
+    "dotenv": "17.2.3",
+    "ejs": "3.1.10",
+    "express": "5.1.0",
+    "express-session": "1.18.2",
+    "helmet": "8.1.0",
+    "multer": "2.0.2"
+  },
+  "devDependencies": {
+    "cross-env": "10.1.0",
+    "prisma": "6.16.2",
+    "supertest": "7.1.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

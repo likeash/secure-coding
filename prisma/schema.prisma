@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  Int                  @id @default(autoincrement())
+  username            String               @unique
+  nickname            String
+  passwordHash        String
+  bio                 String               @default("")
+  role                String               @default("USER")
+  balance             Int                  @default(10000)
+  failedLoginAttempts Int                  @default(0)
+  loginLockedUntil    DateTime?
+  dormantUntil        DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  products            Product[]
+  reportsMade         Report[]             @relation("ReportsMade")
+  userReportsReceived Report[]             @relation("ReportTargetUser")
+  globalMessages      GlobalMessage[]
+  directMessages      DirectMessage[]
+  conversationsA      DirectConversation[] @relation("ConversationUserA")
+  conversationsB      DirectConversation[] @relation("ConversationUserB")
+  blocksMade          UserBlock[]           @relation("Blocker")
+  blocksReceived      UserBlock[]           @relation("Blocked")
+  productBlocks       ProductBlock[]
+  sentTransfers       Transfer[]            @relation("TransferSender")
+  receivedTransfers   Transfer[]            @relation("TransferReceiver")
+  adminAudits         AdminAudit[]           @relation("AuditAdmin")
+}
+
+model Product {
+  id          Int            @id @default(autoincrement())
+  name        String
+  description String
+  price       Int
+  category    String
+  status      String         @default("ACTIVE")
+  ownerId     Int
+  owner       User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  images      ProductImage[]
+  reports     Report[]
+  blocks      ProductBlock[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([status, createdAt])
+  @@index([category, price])
+}
+
+model ProductImage {
+  id           Int      @id @default(autoincrement())
+  storageName  String   @unique
+  originalName String
+  mimeType     String
+  size         Int
+  productId    Int
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+}
+
+model GlobalMessage {
+  id        Int      @id @default(autoincrement())
+  body      String
+  senderId  Int
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model DirectConversation {
+  id        Int             @id @default(autoincrement())
+  userAId   Int
+  userBId   Int
+  userA     User            @relation("ConversationUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User            @relation("ConversationUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  messages  DirectMessage[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@unique([userAId, userBId])
+}
+
+model DirectMessage {
+  id             Int                @id @default(autoincrement())
+  body           String
+  senderId       Int
+  sender         User               @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  conversationId Int
+  conversation   DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime           @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model UserBlock {
+  id        Int      @id @default(autoincrement())
+  blockerId Int
+  blockedId Int
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+}
+
+model ProductBlock {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  productId Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
+
+model Report {
+  id           Int      @id @default(autoincrement())
+  reason       String
+  reporterId   Int
+  productId    Int?
+  targetUserId Int?
+  reporter     User     @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  product      Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  targetUser   User?    @relation("ReportTargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@unique([reporterId, productId])
+  @@unique([reporterId, targetUserId])
+}
+
+model Transfer {
+  id         Int      @id @default(autoincrement())
+  senderId   Int
+  receiverId Int
+  amount     Int
+  memo       String   @default("")
+  sender     User     @relation("TransferSender", fields: [senderId], references: [id], onDelete: Restrict)
+  receiver   User     @relation("TransferReceiver", fields: [receiverId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+
+  @@index([senderId, createdAt])
+  @@index([receiverId, createdAt])
+}
+
+model AdminAudit {
+  id         Int      @id @default(autoincrement())
+  adminId    Int
+  action     String
+  targetType String
+  targetId   Int
+  detail     String   @default("")
+  admin      User     @relation("AuditAdmin", fields: [adminId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+}

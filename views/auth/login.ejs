@@ -1,0 +1,11 @@
+<%- include('../partials/header', { title }) %>
+<section class="auth-shell">
+  <div><span class="eyebrow">WELCOME BACK</span><h1>다시 만났네요.</h1><p>내 상품과 대화를 이어서 확인하세요.</p></div>
+  <form class="card form" method="post" action="/login">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>아이디<input name="username" autocomplete="username" required maxlength="24"></label>
+    <label>비밀번호<input type="password" name="password" autocomplete="current-password" required maxlength="128"></label>
+    <button class="button wide">로그인</button><p class="muted">아직 계정이 없나요? <a href="/register">회원가입</a></p>
+  </form>
+</section>
+<%- include('../partials/footer') %>
