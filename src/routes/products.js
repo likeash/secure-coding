@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const fs = require('fs/promises');
+const fsSync = require('fs');
 const path = require('path');
 const { prisma } = require('../db');
 const { requireAuth, setFlash } = require('../middleware/auth');
@@ -9,7 +10,8 @@ const { CATEGORIES, SORTS, cleanText, validCategory, getSort, positiveInt } = re
 const { MemoryRateLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
-const imageRoot = path.resolve(__dirname, '../../storage/product-images');
+const imageRoot = path.resolve(process.env.UPLOAD_DIR || path.join(__dirname, '../../storage/product-images'));
+fsSync.mkdirSync(imageRoot, { recursive: true });
 const searchLimiter = new MemoryRateLimiter({ windowMs: 60_000, max: 20 });
 
 async function hiddenOwnerIds(userId) {

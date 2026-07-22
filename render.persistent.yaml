@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: tiny-second-hand-market-persistent
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: pnpm install --frozen-lockfile && pnpm prisma:generate
+    startCommand: pnpm start:render
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    disk:
+      name: tiny-market-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: '22'
+      - key: DATABASE_URL
+        value: file:/var/data/tiny-market.db
+      - key: SESSION_DIR
+        value: /var/data
+      - key: SESSION_DB
+        value: sessions.sqlite
+      - key: UPLOAD_DIR
+        value: /var/data/product-images
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false

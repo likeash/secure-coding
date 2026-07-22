@@ -16,7 +16,7 @@ async function main() {
   await prisma.user.upsert({
     where: { username },
     create: { username, nickname: '관리자', passwordHash, role: 'ADMIN', balance: 100000 },
-    update: { passwordHash, role: 'ADMIN' },
+    update: { role: 'ADMIN' },
   });
   console.log(`관리자 계정 '${username}'을 준비했습니다.`);
 }

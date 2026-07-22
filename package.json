@@ -4,14 +4,16 @@
   "private": true,
   "description": "보안 요구사항을 적용한 소형 중고거래 플랫폼",
   "main": "server.js",
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "dev": "node --watch server.js",
     "start": "node server.js",
+    "start:render": "node scripts/render-start.js",
     "prisma:generate": "prisma generate",
     "db:migrate": "prisma migrate dev --name init",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "node prisma/seed.js",
-    "test": "node tests/setup-db.js && cross-env DATABASE_URL=file:./test.db SESSION_DB=test-sessions.sqlite prisma db push --force-reset && cross-env DATABASE_URL=file:./test.db SESSION_DB=test-sessions.sqlite node --test"
+    "test": "node tests/setup-db.js && cross-env DATABASE_URL=file:./test.db SESSION_DB=test-sessions.sqlite prisma db push --force-reset --skip-generate && cross-env DATABASE_URL=file:./test.db SESSION_DB=test-sessions.sqlite node --test"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
@@ -33,6 +35,6 @@
     "supertest": "7.1.4"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20 <25"
   }
 }

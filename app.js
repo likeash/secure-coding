@@ -19,17 +19,22 @@ function createApp() {
   const app = express();
   const SQLiteStore = connectSqlite3(session);
   const production = process.env.NODE_ENV === 'production';
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (production && (!sessionSecret || sessionSecret.length < 32)) {
+    throw new Error('SESSION_SECRET must contain at least 32 characters in production.');
+  }
   if (production) app.set('trust proxy', 1);
   app.disable('x-powered-by');
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, 'views'));
   app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], imgSrc: ["'self'", 'data:'], styleSrc: ["'self'"], scriptSrc: ["'self'"] } }, crossOriginResourcePolicy: { policy: 'same-origin' } }));
+  app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
   app.use(express.static(path.join(__dirname, 'public'), { maxAge: production ? '1d' : 0 }));
   app.use(express.urlencoded({ extended: false, limit: '100kb' }));
   app.use(session({
     name: 'tiny.sid',
-    secret: process.env.SESSION_SECRET || crypto.randomBytes(48).toString('hex'),
-    store: new SQLiteStore({ db: process.env.SESSION_DB || 'sessions.sqlite', dir: path.join(__dirname, 'prisma') }),
+    secret: sessionSecret || crypto.randomBytes(48).toString('hex'),
+    store: new SQLiteStore({ db: process.env.SESSION_DB || 'sessions.sqlite', dir: path.resolve(process.env.SESSION_DIR || path.join(__dirname, 'prisma')) }),
     resave: false,
     saveUninitialized: false,
     rolling: true,

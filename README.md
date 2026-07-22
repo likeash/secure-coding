@@ -16,6 +16,26 @@ pnpm start
 
 브라우저에서 `http://localhost:8418`을 엽니다. 운영 환경에서는 HTTPS reverse proxy 뒤에서 `NODE_ENV=production`으로 실행해야 secure 세션 쿠키가 적용됩니다.
 
+## Render 배포
+
+GitHub 저장소에 push한 뒤 Render Dashboard에서 **New > Blueprint**를 선택하고 저장소를 연결합니다.
+
+- 무료 테스트: 기본 `render.yaml`을 사용합니다. Render 무료 웹 서비스의 파일 시스템은 임시이므로 재배포, 재시작 또는 15분 유휴 종료 후 SQLite 데이터·세션·업로드 이미지가 사라집니다.
+- 영구 저장: Blueprint Path를 `render.persistent.yaml`로 지정합니다. 유료 `starter` 웹 서비스와 1GB persistent disk를 사용하며 SQLite, 세션, 업로드를 `/var/data`에 저장합니다.
+
+관련 Render 공식 문서: [Blueprint 설정](https://render.com/docs/blueprint-spec), [웹 서비스 포트 바인딩](https://render.com/docs/web-services), [Persistent Disk](https://render.com/docs/disks), [무료 서비스 제한](https://render.com/docs/free)
+
+Blueprint 생성 화면에서 다음 비밀 환경변수를 입력해야 합니다.
+
+```text
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=11자 이상이며 영문, 숫자, 특수문자를 포함한 비밀번호
+```
+
+`SESSION_SECRET`은 Render가 자동 생성합니다. 시작 시 `scripts/render-start.js`가 SQLite 파일과 저장 폴더를 준비하고 `prisma migrate deploy`, 관리자 seed를 실행한 다음 서버를 시작합니다. 이미 존재하는 관리자의 비밀번호는 재배포 시 덮어쓰지 않습니다.
+
+Render가 제공하는 `PORT`를 사용하고 production에서는 `0.0.0.0`에 바인딩합니다. 상태 확인 경로는 `/health`입니다.
+
 ## 구현 범위
 
 - 가입, 로그인/로그아웃, 공개 프로필, 소개/닉네임/비밀번호 변경

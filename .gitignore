@@ -40,6 +40,9 @@ yarn-error.log*
 *.pid.lock
 
 # Editor and OS metadata
+.agents/
+.claude/
+.codex/
 .vscode/
 .idea/
 *.swp
@@ -47,4 +50,3 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 Desktop.ini
-
