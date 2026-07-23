@@ -3,6 +3,9 @@ process.env.SESSION_SECRET = 'test-session-secret-at-least-32-characters';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const request = require('supertest');
 const argon2 = require('argon2');
 const { createApp } = require('../app');
@@ -10,6 +13,7 @@ const { prisma } = require('../src/db');
 const { validPassword, validCategory, getSort, positiveInt } = require('../src/utils/validation');
 const { validImageMagic } = require('../src/middleware/upload');
 const { MemoryRateLimiter } = require('../src/middleware/rateLimit');
+const { ensureSessionSecret } = require('../scripts/render-start');
 
 const app = createApp();
 
@@ -64,6 +68,25 @@ test('memory limiter blocks after configured threshold and expires', () => {
   assert.equal(limiter.check('ip', 2), false);
   assert.equal(limiter.check('ip', 4000), false);
   assert.equal(limiter.check('ip', 5003), true);
+});
+
+test('Render startup creates and reuses a strong session secret when the configured value is missing or weak', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'tiny-session-secret-'));
+  try {
+    const firstEnv = { SESSION_SECRET: 'too-short' };
+    assert.equal(ensureSessionSecret(directory, firstEnv), 'generated');
+    assert.ok(firstEnv.SESSION_SECRET.length >= 32);
+    assert.equal(fs.readFileSync(path.join(directory, '.session-secret'), 'utf8'), firstEnv.SESSION_SECRET);
+
+    const secondEnv = {};
+    assert.equal(ensureSessionSecret(directory, secondEnv), 'file');
+    assert.equal(secondEnv.SESSION_SECRET, firstEnv.SESSION_SECRET);
+
+    const configuredEnv = { SESSION_SECRET: 'configured-session-secret-at-least-32-characters' };
+    assert.equal(ensureSessionSecret(directory, configuredEnv), 'environment');
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('session cookie is HttpOnly and SameSite=Lax; POST without CSRF is denied', async () => {

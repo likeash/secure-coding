@@ -32,7 +32,7 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=11자 이상이며 영문, 숫자, 특수문자를 포함한 비밀번호
 ```
 
-`SESSION_SECRET`은 Render가 자동 생성합니다. 시작 시 `scripts/render-start.js`가 SQLite 파일과 저장 폴더를 준비하고 `prisma migrate deploy`, 관리자 seed를 실행한 다음 서버를 시작합니다. 이미 존재하는 관리자의 비밀번호는 재배포 시 덮어쓰지 않습니다.
+`SESSION_SECRET`은 Render가 자동 생성합니다. 누락되거나 32자 미만이면 시작 스크립트가 안전한 임의 값을 생성해 `SESSION_DIR/.session-secret`에 권한 `0600`으로 저장하고 재사용하므로, 약한 값을 허용하지 않으면서도 서버가 시작됩니다. 무료 구성에서는 재배포·슬립 후 로컬 데이터와 세션이 초기화될 수 있고, 영구 디스크 구성에서는 비밀키도 `/var/data`에 유지됩니다. 시작 시 `scripts/render-start.js`가 SQLite 파일과 저장 폴더를 준비하고 `prisma migrate deploy`, 관리자 seed를 실행한 다음 서버를 시작합니다. 이미 존재하는 관리자의 비밀번호는 재배포 시 덮어쓰지 않습니다.
 
 Render가 제공하는 `PORT`를 사용하고 production에서는 `0.0.0.0`에 바인딩합니다. 상태 확인 경로는 `/health`입니다.
 
