@@ -3,7 +3,9 @@ process.env.SESSION_SECRET = 'test-session-secret-at-least-32-characters';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
 const http = require('node:http');
+const path = require('node:path');
 const request = require('supertest');
 const argon2 = require('argon2');
 const { Server } = require('socket.io');
@@ -11,7 +13,7 @@ const { io: ioClient } = require('socket.io-client');
 const { createApp } = require('../app');
 const { prisma } = require('../src/db');
 const { validPassword, validCategory, getSort, positiveInt } = require('../src/utils/validation');
-const { validImageMagic } = require('../src/middleware/upload');
+const { validImageMagic, uploadTempRoot } = require('../src/middleware/upload');
 const { MemoryRateLimiter } = require('../src/middleware/rateLimit');
 const { registerChatSockets } = require('../src/realtime/chat');
 
@@ -33,6 +35,15 @@ function csrf(html) {
 async function register(agent, username, nickname = username) {
   const page = await agent.get('/register').expect(200);
   return agent.post('/register').type('form').send({ _csrf: csrf(page.text), username, nickname, password: 'ValidPass123!' });
+}
+
+async function temporaryUploadNames() {
+  try {
+    return (await fs.readdir(uploadTempRoot)).sort();
+  } catch (error) {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  }
 }
 
 test.before(async () => {
@@ -267,12 +278,22 @@ test('direct chat header links to the real other participant, resolved server-si
 });
 
 test('non-admin cannot open admin UI or invoke admin POST', async () => {
+  const anonymous = await request(app).get('/admin').expect(404);
+  assert.match(anonymous.text, /요청한 페이지를 찾을 수 없습니다/);
+  assert.doesNotMatch(anonymous.text, /관리자 권한이 필요합니다/);
+
   const user = request.agent(app);
   await register(user, 'normaluser');
-  await user.get('/admin').expect(403);
+  const dashboard = await user.get('/admin').expect(404);
+  assert.match(dashboard.text, /요청한 페이지를 찾을 수 없습니다/);
+  assert.doesNotMatch(dashboard.text, /관리자 권한이 필요합니다/);
   const page = await user.get('/mypage');
   const target = await prisma.user.findUnique({ where: { username: 'seller1' } });
-  await user.post(`/admin/users/${target.id}/suspend`).type('form').send({ _csrf: csrf(page.text), reason: 'forged' }).expect(403);
+  const dormantUntil = new Date(Date.now() + 30 * 24 * 60 * 60_000);
+  await prisma.user.update({ where: { id: target.id }, data: { dormantUntil } });
+  await user.post(`/admin/users/${target.id}/activate`).type('form').send({ _csrf: csrf(page.text) }).expect(404);
+  const unchangedTarget = await prisma.user.findUnique({ where: { id: target.id } });
+  assert.equal(unchangedTarget.dormantUntil.getTime(), dormantUntil.getTime());
 });
 
 test('five failed passwords lock the account for ten minutes with a uniform response', async () => {
@@ -296,15 +317,61 @@ test('five failed passwords lock the account for ten minutes with a uniform resp
 test('disguised, oversized, and excessive image uploads are rejected', async () => {
   const seller = request.agent(app);
   await register(seller, 'imageseller');
+  const initialTemporaryFiles = await temporaryUploadNames();
   let form = await seller.get('/products/new');
   await seller.post('/products').field('_csrf', csrf(form.text)).field('name', '위장 파일').field('price', '100').field('category', '기타').field('description', '위장된 이미지 파일 테스트').attach('images', Buffer.from('not-a-png-file'), { filename: 'fake.png', contentType: 'image/png' }).expect(302);
   assert.equal(await prisma.product.count({ where: { name: '위장 파일' } }), 0);
+  assert.deepEqual(await temporaryUploadNames(), initialTemporaryFiles);
+  form = await seller.get('/products/new');
+  const validPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  await seller.post('/products').field('_csrf', csrf(form.text)).field('name', '불일치 파일').field('price', '100').field('category', '기타').field('description', '확장자와 MIME 불일치 테스트').attach('images', validPng, { filename: 'mismatch.jpg', contentType: 'image/png' }).expect(400);
+  assert.equal(await prisma.product.count({ where: { name: '불일치 파일' } }), 0);
+  assert.deepEqual(await temporaryUploadNames(), initialTemporaryFiles);
+  form = await seller.get('/products/new');
+  await seller.post('/products').field('_csrf', csrf(form.text)).field('name', 'x').field('price', '100').field('category', '기타').field('description', '상품 검증 실패 후 임시 파일 정리').attach('images', validPng, { filename: 'valid.png', contentType: 'image/png' }).expect(302);
+  assert.deepEqual(await temporaryUploadNames(), initialTemporaryFiles);
   form = await seller.get('/products/new');
   await seller.post('/products').field('_csrf', csrf(form.text)).field('name', '대용량').field('price', '100').field('category', '기타').field('description', '대용량 파일 테스트 상품').attach('images', Buffer.alloc(5 * 1024 * 1024 + 1), { filename: 'large.png', contentType: 'image/png' }).expect(400);
+  assert.deepEqual(await temporaryUploadNames(), initialTemporaryFiles);
   form = await seller.get('/products/new');
   const six = seller.post('/products').field('_csrf', csrf(form.text)).field('name', '파일 여섯개').field('price', '100').field('category', '기타').field('description', '파일 개수 제한 테스트 상품');
   for (let i = 0; i < 6; i += 1) six.attach('images', Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]), { filename: `${i}.png`, contentType: 'image/png' });
   await six.expect(400);
+  assert.deepEqual(await temporaryUploadNames(), initialTemporaryFiles);
+});
+
+test('valid JPG, JPEG, PNG, GIF, and WebP uploads persist and leave no temporary files', async () => {
+  const seller = request.agent(app);
+  await register(seller, 'validimageseller');
+  const initialTemporaryFiles = await temporaryUploadNames();
+  const jpeg = Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==', 'base64');
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  const gif = Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64');
+  const webp = Buffer.from('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA', 'base64');
+  const form = await seller.get('/products/new');
+  const response = seller.post('/products')
+    .field('_csrf', csrf(form.text))
+    .field('name', '정상 이미지 상품')
+    .field('price', '100')
+    .field('category', '기타')
+    .field('description', '정상 이미지 형식 업로드 테스트')
+    .attach('images', jpeg, { filename: 'image.jpg', contentType: 'image/jpeg' })
+    .attach('images', jpeg, { filename: 'image.jpeg', contentType: 'image/jpeg' })
+    .attach('images', png, { filename: 'image.png', contentType: 'image/png' })
+    .attach('images', gif, { filename: 'image.gif', contentType: 'image/gif' })
+    .attach('images', webp, { filename: 'image.webp', contentType: 'image/webp' });
+  await response.expect(302);
+
+  const product = await prisma.product.findFirst({ where: { name: '정상 이미지 상품' }, include: { images: { orderBy: { id: 'asc' } } } });
+  assert.equal(product.images.length, 5);
+  for (const image of product.images) {
+    const imageResponse = await seller.get(`/images/${image.id}`).expect(200);
+    assert.match(imageResponse.headers['content-type'], new RegExp(`^${image.mimeType.replace('/', '\\/')}`));
+  }
+  assert.deepEqual(await temporaryUploadNames(), initialTemporaryFiles);
+
+  await prisma.product.delete({ where: { id: product.id } });
+  await Promise.all(product.images.map((image) => fs.unlink(path.resolve(__dirname, '../storage/product-images', image.storageName))));
 });
 
 test('three product reports block it; duplicate report does not increase count', async () => {
@@ -372,6 +439,39 @@ test('authorized admin can render dashboard and delete a direct message with an 
   await agent.post(`/admin/direct-messages/${message.id}/delete`).type('form').send({ _csrf: csrf(page.text) }).expect(302);
   assert.equal(await prisma.directMessage.findUnique({ where: { id: message.id } }), null);
   assert.equal(await prisma.adminAudit.count({ where: { adminId: admin.id, targetType: 'DIRECT_MESSAGE', targetId: message.id } }), 1);
+});
+
+test('admin activation resets only the restored user report count in the same operation', async () => {
+  const passwordHash = await argon2.hash('ValidPass123!', { type: argon2.argon2id });
+  const admin = await prisma.user.create({ data: { username: 'activateadmin', nickname: '복구관리자', passwordHash, role: 'ADMIN' } });
+  const target = await prisma.user.create({ data: { username: 'activatetarget', nickname: '복구대상', passwordHash: 'test-only', dormantUntil: new Date(Date.now() + 30 * 24 * 60 * 60_000) } });
+  const otherTarget = await prisma.user.create({ data: { username: 'othertarget', nickname: '다른대상', passwordHash: 'test-only' } });
+  const owner = await prisma.user.create({ data: { username: 'reportowner', nickname: '상품소유자', passwordHash: 'test-only' } });
+  const reporters = await Promise.all(['resetreporter1', 'resetreporter2', 'resetreporter3'].map((username) => (
+    prisma.user.create({ data: { username, nickname: username, passwordHash: 'test-only' } })
+  )));
+  const product = await prisma.product.create({ data: { ownerId: owner.id, name: '보존할 상품 신고', description: '사용자 복구와 무관한 상품', price: 10, category: '기타' } });
+  await prisma.report.createMany({
+    data: [
+      { reporterId: reporters[0].id, targetUserId: target.id, reason: '복구 대상 사용자 신고 1' },
+      { reporterId: reporters[1].id, targetUserId: target.id, reason: '복구 대상 사용자 신고 2' },
+      { reporterId: reporters[0].id, targetUserId: otherTarget.id, reason: '다른 사용자 신고' },
+      { reporterId: reporters[2].id, productId: product.id, reason: '상품 신고' },
+    ],
+  });
+
+  const agent = request.agent(app);
+  let page = await agent.get('/login');
+  await agent.post('/login').type('form').send({ _csrf: csrf(page.text), username: admin.username, password: 'ValidPass123!' }).expect(302);
+  page = await agent.get('/admin').expect(200);
+  await agent.post(`/admin/users/${target.id}/activate`).type('form').send({ _csrf: csrf(page.text) }).expect(302);
+
+  const restored = await prisma.user.findUnique({ where: { id: target.id } });
+  assert.equal(restored.dormantUntil, null);
+  assert.equal(await prisma.report.count({ where: { targetUserId: target.id } }), 0);
+  assert.equal(await prisma.report.count({ where: { targetUserId: otherTarget.id } }), 1);
+  assert.equal(await prisma.report.count({ where: { productId: product.id } }), 1);
+  assert.equal(await prisma.adminAudit.count({ where: { adminId: admin.id, action: 'ACTIVATE', targetType: 'USER', targetId: target.id } }), 1);
 });
 
 test('a role change regenerates the existing session ID before applying new privileges', async () => {

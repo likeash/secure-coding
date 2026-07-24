@@ -1,3 +1,6 @@
+const crypto = require('crypto');
+const fs = require('fs');
+const fsPromises = require('fs/promises');
 const path = require('path');
 const multer = require('multer');
 
@@ -5,8 +8,19 @@ const ALLOWED = new Map([
   ['.jpg', 'image/jpeg'], ['.jpeg', 'image/jpeg'], ['.png', 'image/png'], ['.gif', 'image/gif'], ['.webp', 'image/webp'],
 ]);
 
+const uploadTempRoot = path.resolve(__dirname, '../../storage/tmp-uploads');
+
+const storage = multer.diskStorage({
+  destination(req, file, cb) {
+    fs.mkdir(uploadTempRoot, { recursive: true }, (error) => cb(error, uploadTempRoot));
+  },
+  filename(req, file, cb) {
+    cb(null, crypto.randomUUID());
+  },
+});
+
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage,
   limits: { fileSize: 5 * 1024 * 1024, files: 5 },
   fileFilter(req, file, cb) {
     const ext = path.extname(file.originalname).toLowerCase();
@@ -24,4 +38,51 @@ function validImageMagic(buffer, mime) {
   return false;
 }
 
-module.exports = { upload, validImageMagic, ALLOWED };
+async function validImageFile(filePath, mime) {
+  const handle = await fsPromises.open(filePath, 'r');
+  try {
+    const prefix = Buffer.alloc(12);
+    const { bytesRead } = await handle.read(prefix, 0, prefix.length, 0);
+    return validImageMagic(prefix.subarray(0, bytesRead), mime);
+  } finally {
+    await handle.close();
+  }
+}
+
+function isTemporaryUpload(filePath) {
+  if (!filePath) return false;
+  const relative = path.relative(uploadTempRoot, path.resolve(filePath));
+  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+async function cleanupTemporaryFiles(files) {
+  await Promise.all((files || []).map(async (file) => {
+    if (!isTemporaryUpload(file.path)) return;
+    try {
+      await fsPromises.unlink(file.path);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }));
+}
+
+function cleanupTemporaryUploadsAfterResponse(req, res, next) {
+  res.once('finish', () => {
+    cleanupTemporaryFiles(req.files).catch((error) => {
+      if (process.env.NODE_ENV !== 'test') {
+        console.error(`[${new Date().toISOString()}] upload cleanup failed`, error.code || '');
+      }
+    });
+  });
+  next();
+}
+
+module.exports = {
+  upload,
+  validImageMagic,
+  validImageFile,
+  cleanupTemporaryFiles,
+  cleanupTemporaryUploadsAfterResponse,
+  uploadTempRoot,
+  ALLOWED,
+};
