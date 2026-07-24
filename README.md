@@ -55,55 +55,6 @@ pnpm start
 
 브라우저에서 `http://localhost:8418`을 엽니다.
 
-## Render 배포
-
-이 저장소의 `render.yaml`을 사용하는 Blueprint 배포와 Render Dashboard에서 직접 Web Service를 만드는 방법을 모두 지원합니다.
-
-### 방법 A: Blueprint로 배포
-
-1. 이 저장소를 GitHub에 올립니다.
-2. Render Dashboard에서 **New → Blueprint**를 선택합니다.
-3. GitHub 저장소를 연결하고 루트의 `render.yaml`을 선택합니다.
-4. 생성 화면에서 다음 비밀값을 입력합니다.
-   - `ADMIN_USERNAME`
-   - `ADMIN_PASSWORD`
-5. Blueprint를 적용하고 배포가 끝날 때까지 기다립니다.
-6. Render가 제공한 `https://...onrender.com` 주소에서 `/login`과 관리자 로그인을 확인합니다.
-
-`SESSION_SECRET`은 Blueprint의 `generateValue: true` 설정으로 Render가 생성합니다. 실제 비밀값은 `render.yaml`에 저장되지 않습니다.
-
-### 방법 B: Web Service로 직접 배포
-
-Render Dashboard에서 **New → Web Service**를 선택하고 저장소를 연결한 뒤 다음 값을 설정합니다.
-
-| 항목 | 값 |
-| --- | --- |
-| Runtime | `Node` |
-| Build Command | `corepack pnpm install --frozen-lockfile && corepack pnpm prisma:generate` |
-| Start Command | `corepack pnpm start:render` |
-| Health Check Path | `/login` |
-
-환경변수:
-
-| 이름 | 값 또는 조건 |
-| --- | --- |
-| `NODE_ENV` | `production` |
-| `DATABASE_URL` | `file:./render.db` |
-| `SESSION_DB` | `render-sessions.sqlite` |
-| `SESSION_SECRET` | 32자 이상의 임의 문자열 |
-| `ADMIN_USERNAME` | 관리자 아이디 |
-| `ADMIN_PASSWORD` | 11자 이상, 영문·숫자·특수문자 포함 |
-
-Render가 제공하는 `PORT`는 서버가 자동으로 사용합니다. production 환경에서는 서버가 `0.0.0.0`에 바인딩되고, HTTPS 프록시를 신뢰하며 세션 쿠키에 `Secure`가 적용됩니다.
-
-### 배포 후 확인
-
-- `/login`이 200으로 열리는지 확인
-- 관리자 계정으로 로그인 후 `/admin`에 접근 가능한지 확인
-- 일반 사용자와 비로그인 사용자의 `/admin` 접근이 일반 404로 보이는지 확인
-- 상품 이미지 업로드와 실시간 채팅 연결 확인
-- Render 로그에서 Prisma schema sync와 관리자 seed가 성공했는지 확인
-
 ## 주요 보안 통제
 
 - `src/routes/auth.js`: Argon2id 해시, 비밀번호 복잡도 정책, 계정·IP 로그인 제한, 통일된 실패 문구, 로그인 시 세션 재발급
