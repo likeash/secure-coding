@@ -8,7 +8,7 @@ const helmet = require('helmet');
 const multer = require('multer');
 const { attachUser, requireAuth } = require('./src/middleware/auth');
 const { csrfToken, csrfProtect } = require('./src/middleware/security');
-const { upload } = require('./src/middleware/upload');
+const { upload, cleanupTemporaryUploadsAfterResponse } = require('./src/middleware/upload');
 const { router: authRouter } = require('./src/routes/auth');
 const { router: productsRouter } = require('./src/routes/products');
 const { router: accountRouter } = require('./src/routes/account');
@@ -41,7 +41,7 @@ function createApp() {
   app.set('sessionMiddleware', sessionMiddleware);
   app.use(attachUser);
   app.use(csrfToken);
-  app.post('/products', requireAuth, upload.array('images', 5));
+  app.post('/products', requireAuth, upload.array('images', 5), cleanupTemporaryUploadsAfterResponse);
   app.use(csrfProtect);
   app.use(authRouter, productsRouter, accountRouter, chatRouter, adminRouter);
   app.use((req, res) => res.status(404).render('error', { title: '페이지 없음', message: '요청한 페이지를 찾을 수 없습니다.' }));

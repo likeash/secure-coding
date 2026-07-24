@@ -36,8 +36,9 @@ function requireAuth(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.user) return res.status(401).render('error', { title: '로그인 필요', message: '로그인이 필요합니다.' });
-  if (req.user.role !== 'ADMIN') return res.status(403).render('error', { title: '접근 거부', message: '관리자 권한이 필요합니다.' });
+  if (!req.user || req.user.role !== 'ADMIN') {
+    return res.status(404).render('error', { title: '페이지 없음', message: '요청한 페이지를 찾을 수 없습니다.' });
+  }
   next();
 }
 

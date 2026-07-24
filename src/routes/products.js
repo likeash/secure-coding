@@ -1,10 +1,11 @@
 const express = require('express');
 const crypto = require('crypto');
+const { constants: fsConstants } = require('fs');
 const fs = require('fs/promises');
 const path = require('path');
 const { prisma } = require('../db');
 const { requireAuth, setFlash } = require('../middleware/auth');
-const { validImageMagic } = require('../middleware/upload');
+const { validImageFile, cleanupTemporaryFiles } = require('../middleware/upload');
 const { CATEGORIES, SORTS, cleanText, validCategory, getSort, positiveInt } = require('../utils/validation');
 const { MemoryRateLimiter } = require('../middleware/rateLimit');
 
@@ -22,16 +23,19 @@ async function persistImages(files, productId) {
   const written = [];
   try {
     for (const file of files || []) {
-      if (!validImageMagic(file.buffer, file.mimetype)) throw Object.assign(new Error('INVALID_IMAGE'), { status: 400 });
+      if (!await validImageFile(file.path, file.mimetype)) throw Object.assign(new Error('INVALID_IMAGE'), { status: 400 });
       const ext = path.extname(file.originalname).toLowerCase();
       const storageName = `${crypto.randomUUID()}${ext}`;
-      await fs.writeFile(path.join(imageRoot, storageName), file.buffer, { flag: 'wx' });
+      await fs.copyFile(file.path, path.join(imageRoot, storageName), fsConstants.COPYFILE_EXCL);
       written.push(storageName);
+      await fs.unlink(file.path);
       await prisma.productImage.create({ data: { storageName, originalName: cleanText(file.originalname, 120), mimeType: file.mimetype, size: file.size, productId } });
     }
   } catch (error) {
     await Promise.all(written.map((name) => fs.unlink(path.join(imageRoot, name)).catch(() => {})));
     throw error;
+  } finally {
+    await cleanupTemporaryFiles(files);
   }
 }
 

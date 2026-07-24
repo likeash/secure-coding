@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: tiny-market
+    runtime: node
+    plan: free
+    buildCommand: corepack pnpm install --frozen-lockfile && corepack pnpm prisma:generate
+    startCommand: corepack pnpm start:render
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        value: file:./render.db
+      - key: SESSION_DB
+        value: render-sessions.sqlite
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false

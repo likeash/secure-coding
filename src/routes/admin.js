@@ -46,6 +46,7 @@ router.post('/admin/users/:id/activate', async (req, res, next) => {
     const id = positiveInt(req.params.id, 1, Number.MAX_SAFE_INTEGER) || -1;
     await prisma.$transaction([
       prisma.user.update({ where: { id }, data: { dormantUntil: null } }),
+      prisma.report.deleteMany({ where: { targetUserId: id } }),
       prisma.adminAudit.create({ data: { adminId: req.user.id, action: 'ACTIVATE', targetType: 'USER', targetId: id } }),
     ]);
     setFlash(req, 'success', '사용자 제한을 해제했습니다.');
