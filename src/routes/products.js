@@ -91,18 +91,52 @@ router.get('/products/mine', requireAuth, async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+const HIDDEN_STATUSES = ['BLOCKED', 'DELETED'];
+
 router.get('/products/:id', async (req, res, next) => {
   try {
     const id = positiveInt(req.params.id, 1, Number.MAX_SAFE_INTEGER);
-    const product = id && await prisma.product.findUnique({ where: { id }, include: { owner: { select: { id: true, nickname: true, bio: true, dormantUntil: true } }, images: true, _count: { select: { reports: true } } } });
+    const product = id && await prisma.product.findUnique({ where: { id }, include: { owner: { select: { id: true, nickname: true, bio: true, dormantUntil: true } }, buyer: { select: { id: true, nickname: true } }, images: true, _count: { select: { reports: true } } } });
     const privileged = product && req.user && (req.user.id === product.ownerId || req.user.role === 'ADMIN');
-    if (!product || (product.status !== 'ACTIVE' && !privileged)) return res.status(404).render('error', { title: '상품 없음', message: '상품을 찾을 수 없습니다.' });
+    if (!product || (HIDDEN_STATUSES.includes(product.status) && !privileged)) return res.status(404).render('error', { title: '상품 없음', message: '상품을 찾을 수 없습니다.' });
     if (req.user) {
       const blocked = await prisma.productBlock.findUnique({ where: { userId_productId: { userId: req.user.id, productId: product.id } } });
       if (blocked && !privileged) return res.status(404).render('error', { title: '상품 없음', message: '상품을 찾을 수 없습니다.' });
     }
     res.render('products/detail', { title: product.name, product, canManage: Boolean(privileged) });
   } catch (error) { next(error); }
+});
+
+router.post('/products/:id/purchase', requireAuth, async (req, res, next) => {
+  const id = positiveInt(req.params.id, 1, Number.MAX_SAFE_INTEGER) || -1;
+  try {
+    await prisma.$transaction(async (tx) => {
+      const product = await tx.product.findUnique({ where: { id } });
+      if (!product || product.status !== 'ACTIVE') throw Object.assign(new Error('NOT_AVAILABLE'), { publicCode: 'NOT_AVAILABLE' });
+      if (product.ownerId === req.user.id) throw Object.assign(new Error('SELF_PURCHASE'), { publicCode: 'SELF_PURCHASE' });
+      const buyer = await tx.user.findUnique({ where: { id: req.user.id } });
+      if (!buyer || buyer.balance < product.price) throw Object.assign(new Error('INSUFFICIENT'), { publicCode: 'INSUFFICIENT' });
+      const claim = await tx.product.updateMany({ where: { id, status: 'ACTIVE' }, data: { status: 'SOLD', buyerId: req.user.id, soldAt: new Date() } });
+      if (claim.count !== 1) throw Object.assign(new Error('NOT_AVAILABLE'), { publicCode: 'NOT_AVAILABLE' });
+      const debit = await tx.user.updateMany({ where: { id: req.user.id, balance: { gte: product.price } }, data: { balance: { decrement: product.price } } });
+      if (debit.count !== 1) throw Object.assign(new Error('INSUFFICIENT'), { publicCode: 'INSUFFICIENT' });
+      await tx.user.update({ where: { id: product.ownerId }, data: { balance: { increment: product.price } } });
+      await tx.transfer.create({ data: { senderId: req.user.id, receiverId: product.ownerId, amount: product.price, productId: product.id, memo: cleanText(`상품 구매: ${product.name}`, 100), status: 'COMPLETED' } });
+    });
+    setFlash(req, 'success', '구매가 완료되었습니다.');
+    res.redirect(`/products/${id}`);
+  } catch (error) {
+    if (error.publicCode) {
+      const message = { NOT_AVAILABLE: '이미 판매되었거나 구매할 수 없는 상품입니다.', SELF_PURCHASE: '본인 상품은 구매할 수 없습니다.', INSUFFICIENT: '잔액이 부족합니다.' }[error.publicCode] || '구매를 처리할 수 없습니다.';
+      setFlash(req, 'error', message);
+      return res.redirect(`/products/${id}`);
+    }
+    if (error.code === 'P2002') {
+      setFlash(req, 'error', '이미 판매된 상품입니다.');
+      return res.redirect(`/products/${id}`);
+    }
+    next(error);
+  }
 });
 
 router.get('/products/:id/edit', requireAuth, async (req, res, next) => {
@@ -146,7 +180,7 @@ router.get('/images/:id', async (req, res, next) => {
   try {
     const image = await prisma.productImage.findUnique({ where: { id: positiveInt(req.params.id, 1, Number.MAX_SAFE_INTEGER) || -1 }, include: { product: true } });
     const privileged = image && req.user && (req.user.id === image.product.ownerId || req.user.role === 'ADMIN');
-    if (!image || (image.product.status !== 'ACTIVE' && !privileged)) return res.sendStatus(404);
+    if (!image || (HIDDEN_STATUSES.includes(image.product.status) && !privileged)) return res.sendStatus(404);
     res.type(image.mimeType).set('X-Content-Type-Options', 'nosniff').sendFile(path.join(imageRoot, image.storageName));
   } catch (error) { next(error); }
 });

@@ -23,10 +23,10 @@ function createApp() {
   app.disable('x-powered-by');
   app.set('view engine', 'ejs');
   app.set('views', path.join(__dirname, 'views'));
-  app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], imgSrc: ["'self'", 'data:'], styleSrc: ["'self'"], scriptSrc: ["'self'"] } }, crossOriginResourcePolicy: { policy: 'same-origin' } }));
+  app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], imgSrc: ["'self'", 'data:'], styleSrc: ["'self'"], scriptSrc: ["'self'"], connectSrc: ["'self'"] } }, crossOriginResourcePolicy: { policy: 'same-origin' } }));
   app.use(express.static(path.join(__dirname, 'public'), { maxAge: production ? '1d' : 0 }));
   app.use(express.urlencoded({ extended: false, limit: '100kb' }));
-  app.use(session({
+  const sessionMiddleware = session({
     name: 'tiny.sid',
     secret: process.env.SESSION_SECRET || crypto.randomBytes(48).toString('hex'),
     store: new SQLiteStore({ db: process.env.SESSION_DB || 'sessions.sqlite', dir: path.join(__dirname, 'prisma') }),
@@ -34,7 +34,11 @@ function createApp() {
     saveUninitialized: false,
     rolling: true,
     cookie: { httpOnly: true, sameSite: 'lax', secure: production, maxAge: 30 * 60_000 },
-  }));
+  });
+  app.use(sessionMiddleware);
+  // Exposed so server.js can wire the exact same session instance (secret + store)
+  // into Socket.IO's handshake pipeline via io.engine.use(...).
+  app.set('sessionMiddleware', sessionMiddleware);
   app.use(attachUser);
   app.use(csrfToken);
   app.post('/products', requireAuth, upload.array('images', 5));

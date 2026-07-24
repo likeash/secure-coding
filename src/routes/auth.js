@@ -31,7 +31,8 @@ router.post('/register', async (req, res, next) => {
     });
   } catch (error) {
     if (error.code === 'P2002') {
-      setFlash(req, 'error', '이미 사용 중인 아이디입니다.');
+      const target = Array.isArray(error.meta?.target) ? error.meta.target.join(',') : String(error.meta?.target || '');
+      setFlash(req, 'error', target.includes('nickname') ? '이미 사용 중인 닉네임입니다.' : '이미 사용 중인 아이디입니다.');
       return res.redirect('/register');
     }
     next(error);

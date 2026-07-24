@@ -16,7 +16,7 @@ router.get('/admin', async (req, res, next) => {
       prisma.user.findMany({ select: { id: true, username: true, nickname: true, role: true, balance: true, dormantUntil: true, createdAt: true, _count: { select: { userReportsReceived: true } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
       prisma.product.findMany({ include: { owner: { select: { nickname: true } }, _count: { select: { reports: true } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
       prisma.report.findMany({ include: { reporter: { select: { nickname: true } }, product: { select: { name: true } }, targetUser: { select: { nickname: true } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
-      prisma.transfer.findMany({ include: { sender: { select: { nickname: true } }, receiver: { select: { nickname: true } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
+      prisma.transfer.findMany({ include: { sender: { select: { nickname: true } }, receiver: { select: { nickname: true } }, product: { select: { name: true } } }, orderBy: { createdAt: 'desc' }, take: 100 }),
       prisma.globalMessage.findMany({ include: { sender: { select: { nickname: true } } }, orderBy: { createdAt: 'desc' }, take: 50 }),
       prisma.directMessage.findMany({ include: { sender: { select: { nickname: true } }, conversation: { include: { userA: { select: { nickname: true } }, userB: { select: { nickname: true } } } } }, orderBy: { createdAt: 'desc' }, take: 50 }),
       prisma.adminAudit.findMany({ include: { admin: { select: { nickname: true } } }, orderBy: { createdAt: 'desc' }, take: 50 }),

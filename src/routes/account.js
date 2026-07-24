@@ -17,7 +17,7 @@ router.get('/users/:id', async (req, res, next) => {
 
 router.get('/mypage', requireAuth, async (req, res, next) => {
   try {
-    const transfers = await prisma.transfer.findMany({ where: { OR: [{ senderId: req.user.id }, { receiverId: req.user.id }] }, include: { sender: { select: { nickname: true } }, receiver: { select: { nickname: true } } }, orderBy: { createdAt: 'desc' }, take: 30 });
+    const transfers = await prisma.transfer.findMany({ where: { OR: [{ senderId: req.user.id }, { receiverId: req.user.id }] }, include: { sender: { select: { nickname: true } }, receiver: { select: { nickname: true } }, product: { select: { name: true } } }, orderBy: { createdAt: 'desc' }, take: 30 });
     res.render('mypage', { title: '마이페이지', transfers });
   } catch (error) { next(error); }
 });
@@ -33,7 +33,13 @@ router.post('/mypage/profile', requireAuth, async (req, res, next) => {
     await prisma.user.update({ where: { id: req.user.id }, data: { nickname, bio } });
     setFlash(req, 'success', '프로필을 업데이트했습니다.');
     res.redirect('/mypage');
-  } catch (error) { next(error); }
+  } catch (error) {
+    if (error.code === 'P2002') {
+      setFlash(req, 'error', '이미 사용 중인 닉네임입니다.');
+      return res.redirect('/mypage');
+    }
+    next(error);
+  }
 });
 
 router.post('/mypage/password', requireAuth, async (req, res, next) => {
@@ -55,34 +61,6 @@ router.post('/mypage/password', requireAuth, async (req, res, next) => {
       res.redirect('/mypage');
     });
   } catch (error) { next(error); }
-});
-
-router.post('/transfers', requireAuth, async (req, res, next) => {
-  try {
-    const recipient = cleanText(req.body.recipient, 24);
-    const amount = positiveInt(req.body.amount, 1, 100000);
-    const memo = cleanText(req.body.memo, 100);
-    if (!amount) {
-      setFlash(req, 'error', '송금액은 1~100,000P의 정수여야 합니다.');
-      return res.redirect('/mypage');
-    }
-    await prisma.$transaction(async (tx) => {
-      const receiver = await tx.user.findUnique({ where: { username: recipient } });
-      if (!receiver || receiver.id === req.user.id || (receiver.dormantUntil && receiver.dormantUntil > new Date())) throw Object.assign(new Error('INVALID_RECEIVER'), { publicCode: 'INVALID_RECEIVER' });
-      const debit = await tx.user.updateMany({ where: { id: req.user.id, balance: { gte: amount } }, data: { balance: { decrement: amount } } });
-      if (debit.count !== 1) throw Object.assign(new Error('INSUFFICIENT'), { publicCode: 'INSUFFICIENT' });
-      await tx.user.update({ where: { id: receiver.id }, data: { balance: { increment: amount } } });
-      await tx.transfer.create({ data: { senderId: req.user.id, receiverId: receiver.id, amount, memo } });
-    });
-    setFlash(req, 'success', `${amount.toLocaleString()}P를 송금했습니다.`);
-    res.redirect('/mypage');
-  } catch (error) {
-    if (error.publicCode) {
-      setFlash(req, 'error', error.publicCode === 'INSUFFICIENT' ? '잔액이 부족합니다.' : '수신자를 확인해 주세요.');
-      return res.redirect('/mypage');
-    }
-    next(error);
-  }
 });
 
 router.post('/users/:id/block', requireAuth, async (req, res, next) => {
