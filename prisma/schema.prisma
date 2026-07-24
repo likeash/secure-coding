@@ -10,7 +10,7 @@ datasource db {
 model User {
   id                  Int                  @id @default(autoincrement())
   username            String               @unique
-  nickname            String
+  nickname            String               @unique
   passwordHash        String
   bio                 String               @default("")
   role                String               @default("USER")
@@ -21,6 +21,7 @@ model User {
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   products            Product[]
+  purchasedProducts   Product[]            @relation("ProductBuyer")
   reportsMade         Report[]             @relation("ReportsMade")
   userReportsReceived Report[]             @relation("ReportTargetUser")
   globalMessages      GlobalMessage[]
@@ -44,9 +45,13 @@ model Product {
   status      String         @default("ACTIVE")
   ownerId     Int
   owner       User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  buyerId     Int?
+  buyer       User?          @relation("ProductBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  soldAt      DateTime?
   images      ProductImage[]
   reports     Report[]
   blocks      ProductBlock[]
+  purchase    Transfer?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
@@ -143,6 +148,9 @@ model Transfer {
   receiverId Int
   amount     Int
   memo       String   @default("")
+  productId  Int?     @unique
+  status     String   @default("COMPLETED")
+  product    Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
   sender     User     @relation("TransferSender", fields: [senderId], references: [id], onDelete: Restrict)
   receiver   User     @relation("TransferReceiver", fields: [receiverId], references: [id], onDelete: Restrict)
   createdAt  DateTime @default(now())
